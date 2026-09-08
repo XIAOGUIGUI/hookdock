@@ -1,0 +1,43 @@
+name: HookDock Windows CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      - run: npm run version:check
+      - run: npm run typecheck
+      - run: npm run npm:test
+      - run: cargo fmt --all --check
+      - run: cargo test --workspace
+      - run: npm run dist:win
+      - name: Normalize installer name
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem target/release/bundle/nsis/*.exe | Select-Object -First 1
+          if (-not $installer) { throw "NSIS installer was not produced" }
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item $installer.FullName release/HookDock-Setup-x64.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HookDock-Windows-x64
+          path: release/HookDock-Setup-x64.exe
+          if-no-files-found: error
+

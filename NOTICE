@@ -1,0 +1,14 @@
+HookDock
+Copyright 2026 XIAOGUIGUI and HookDock contributors
+
+This product includes modified source code from Ping Island:
+https://github.com/erha19/ping-island
+Copyright 2026 Ping Island contributors
+Licensed under the Apache License, Version 2.0.
+
+HookDock changes the original Windows prototype with independent branding,
+artwork, a localhost HTTP API, per-source notification profiles,
+localization, and a separate GitHub/npm release system.
+
+The contents of this NOTICE file are informational and do not modify the
+terms of the Apache License, Version 2.0.

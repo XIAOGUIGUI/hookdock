@@ -1,0 +1,29 @@
+[package]
+name = "hookdock-windows"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "hookdock_windows_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+chrono.workspace = true
+dirs = "6"
+hookdock-protocol = { path = "../crates/protocol" }
+rand.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-autostart = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+
+[dev-dependencies]
+tempfile = "3"

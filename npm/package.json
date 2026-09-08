@@ -1,0 +1,32 @@
+{
+  "name": "@xiaoguigui/hookdock",
+  "version": "0.1.0",
+  "description": "Verified downloader for the HookDock Windows installer",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/XIAOGUIGUI/hookdock.git"
+  },
+  "homepage": "https://github.com/XIAOGUIGUI/hookdock#readme",
+  "bugs": "https://github.com/XIAOGUIGUI/hookdock/issues",
+  "type": "module",
+  "bin": {
+    "hookdock": "bin/hookdock.mjs"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.17"
+  },
+  "scripts": {
+    "test": "node --test",
+    "pack:check": "npm pack --dry-run"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  }
+}

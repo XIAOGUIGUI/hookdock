@@ -1,0 +1,10 @@
+[package]
+name = "hookdock-hook"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+hookdock-protocol = { path = "../crates/protocol" }
+serde_json.workspace = true
+uuid.workspace = true

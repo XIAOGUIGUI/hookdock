@@ -1,0 +1,33 @@
+{
+  "name": "hookdock-windows",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A Windows notification hub for AI coding tools and local automation",
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "frontend:dev": "vite --host 127.0.0.1 --port 1420",
+    "build": "vite build",
+    "bridge:build": "node scripts/build-bridge.mjs",
+    "typecheck": "tsc --noEmit",
+    "version:check": "node scripts/check-versions.mjs",
+    "npm:test": "npm test --prefix npm && npm run pack:check --prefix npm",
+    "check": "npm run version:check && npm run npm:test && npm run bridge:build && npm run typecheck && cargo test --workspace",
+    "dist:win": "npm run bridge:build && tauri build"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.8.0",
+    "lucide-react": "^0.544.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "latest",
+    "@tauri-apps/cli": "^2.8.0",
+    "typescript": "7.0.2",
+    "vite": "8.2.2"
+  }
+}
