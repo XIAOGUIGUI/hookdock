@@ -40,7 +40,7 @@ jobs:
         run: node scripts/stage-release.mjs
       - name: Test packed npm CLI
         run: node scripts/test-packed-npm.mjs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: HookDock-Windows-x64
           path: release/*

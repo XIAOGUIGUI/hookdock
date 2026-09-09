@@ -42,7 +42,7 @@ jobs:
       - name: Test packed npm CLI
         run: node scripts/test-packed-npm.mjs
       - name: Upload release candidate
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: HookDock-release-candidate
           path: release/*
