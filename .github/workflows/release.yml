@@ -17,12 +17,12 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
-          node-version: 22
-          cache: npm
+          node-version: 24
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
@@ -70,8 +70,6 @@ jobs:
       - name: Publish npm downloader
         if: startsWith(github.ref, 'refs/tags/v') && steps.npm_version.outputs.published != 'true'
         shell: pwsh
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           $tarball = Get-ChildItem release/*.tgz | Select-Object -First 1
           if (-not $tarball) { throw "npm tarball was not produced" }
