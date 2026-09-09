@@ -18,8 +18,9 @@ try {
   const install = spawnSync(
     npmCommand,
     ["install", "--ignore-scripts", "--no-audit", "--no-fund", "--prefix", smokeDirectory, path.join(releaseDirectory, tarballs[0])],
-    { stdio: "inherit" },
+    { stdio: "inherit", shell: process.platform === "win32" },
   );
+  if (install.error) throw install.error;
   if (install.status !== 0) process.exit(install.status ?? 1);
 
   const executable = path.join(
@@ -28,7 +29,11 @@ try {
     ".bin",
     process.platform === "win32" ? "hookdock.cmd" : "hookdock",
   );
-  const help = spawnSync(executable, ["--help"], { encoding: "utf8" });
+  const help = spawnSync(executable, ["--help"], {
+    encoding: "utf8",
+    shell: process.platform === "win32",
+  });
+  if (help.error) throw help.error;
   if (help.status !== 0 || !help.stdout.includes("Download the verified HookDock Windows installer")) {
     process.stderr.write(help.stdout ?? "");
     process.stderr.write(help.stderr ?? "");

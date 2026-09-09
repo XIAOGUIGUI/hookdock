@@ -39,8 +39,9 @@ const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const packed = spawnSync(
   npmCommand,
   ["pack", "--json", "--pack-destination", releaseDirectory],
-  { cwd: npmDirectory, encoding: "utf8" },
+  { cwd: npmDirectory, encoding: "utf8", shell: process.platform === "win32" },
 );
+if (packed.error) throw packed.error;
 if (packed.status !== 0) {
   process.stderr.write(packed.stdout ?? "");
   process.stderr.write(packed.stderr ?? "");
