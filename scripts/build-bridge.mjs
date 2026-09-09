@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const windowsDirectory = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-const build = spawnSync("cargo", ["build", "--release", "--package", "hookdock-hook"], {
+const build = spawnSync("cargo", ["build", "--locked", "--release", "--package", "hookdock-hook"], {
   cwd: windowsDirectory,
   stdio: "inherit",
 });

@@ -3,10 +3,16 @@ name: HookDock Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: windows-latest
+    timeout-minutes: 60
     permissions:
       contents: write
       id-token: write
@@ -21,30 +27,57 @@ jobs:
         with:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - run: npm ci
       - run: npm run version:check
       - run: npm run typecheck
       - run: npm run npm:test
       - run: cargo fmt --all --check
       - run: npm run bridge:build
-      - run: cargo test --workspace
-      - run: npm run dist:win
-      - name: Prepare signed-by-checksum release assets
+      - run: cargo test --workspace --locked
+      - run: npm run app:build
+      - name: Stage release assets
+        run: node scripts/stage-release.mjs
+      - name: Test packed npm CLI
+        run: node scripts/test-packed-npm.mjs
+      - name: Upload release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: HookDock-release-candidate
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Check npm version availability
+        if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         run: |
-          $installer = Get-ChildItem target/release/bundle/nsis/*.exe | Select-Object -First 1
-          if (-not $installer) { throw "NSIS installer was not produced" }
-          New-Item -ItemType Directory -Force release | Out-Null
-          Copy-Item $installer.FullName release/HookDock-Setup-x64.exe
-          $hash = (Get-FileHash release/HookDock-Setup-x64.exe -Algorithm SHA256).Hash.ToLowerInvariant()
-          "$hash  HookDock-Setup-x64.exe" | Set-Content -Encoding ascii release/checksums.txt
+          $manifest = Get-Content release/manifest.json -Raw | ConvertFrom-Json
+          $package = "$($manifest.npmPackage)@$($manifest.version)"
+          $publishedVersion = npm view $package version --json 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            throw "$package is already published and cannot be overwritten."
+          }
+          $lookupError = $publishedVersion | ConvertFrom-Json
+          if ($lookupError.error.code -ne "E404") {
+            throw "Could not check npm version availability: $publishedVersion"
+          }
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create $env:GITHUB_REF_NAME release/HookDock-Setup-x64.exe release/checksums.txt --repo $env:GITHUB_REPOSITORY --generate-notes --verify-tag
+        run: |
+          $assets = @(Get-ChildItem release -File | ForEach-Object { $_.FullName })
+          if ($assets.Count -lt 4) { throw "Expected installer, npm tarball, checksums, and manifest" }
+          gh release create $env:GITHUB_REF_NAME $assets --repo $env:GITHUB_REPOSITORY --generate-notes --verify-tag
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Publish npm downloader
-        working-directory: npm
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance
+        run: |
+          $tarball = Get-ChildItem release/*.tgz | Select-Object -First 1
+          if (-not $tarball) { throw "npm tarball was not produced" }
+          npm publish $tarball.FullName --access public --provenance

@@ -6,9 +6,14 @@ on:
   pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   windows:
     runs-on: windows-latest
+    timeout-minutes: 60
     permissions:
       contents: read
     steps:
@@ -21,23 +26,23 @@ jobs:
         with:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - run: npm ci
       - run: npm run version:check
       - run: npm run typecheck
       - run: npm run npm:test
       - run: cargo fmt --all --check
       - run: npm run bridge:build
-      - run: cargo test --workspace
-      - run: npm run dist:win
-      - name: Normalize installer name
-        shell: pwsh
-        run: |
-          $installer = Get-ChildItem target/release/bundle/nsis/*.exe | Select-Object -First 1
-          if (-not $installer) { throw "NSIS installer was not produced" }
-          New-Item -ItemType Directory -Force release | Out-Null
-          Copy-Item $installer.FullName release/HookDock-Setup-x64.exe
+      - run: cargo test --workspace --locked
+      - run: npm run app:build
+      - name: Stage installer and npm package
+        run: node scripts/stage-release.mjs
+      - name: Test packed npm CLI
+        run: node scripts/test-packed-npm.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: HookDock-Windows-x64
-          path: release/HookDock-Setup-x64.exe
+          path: release/*
           if-no-files-found: error
+          retention-days: 14

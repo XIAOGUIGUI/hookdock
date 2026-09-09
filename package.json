@@ -9,11 +9,12 @@
     "frontend:dev": "vite --host 127.0.0.1 --port 1420",
     "build": "vite build",
     "bridge:build": "node scripts/build-bridge.mjs",
+    "app:build": "tauri build",
     "typecheck": "tsc --noEmit",
     "version:check": "node scripts/check-versions.mjs",
     "npm:test": "npm test --prefix npm && npm run pack:check --prefix npm",
     "check": "npm run version:check && npm run npm:test && npm run bridge:build && npm run typecheck && cargo test --workspace",
-    "dist:win": "npm run bridge:build && tauri build"
+    "dist:win": "npm run bridge:build && npm run app:build"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.8.0",
