@@ -16,7 +16,7 @@ export function usage() {
     "Download the verified HookDock Windows installer.",
     "",
     "Usage:",
-    "  npx @xiaoguigui/hookdock download [--output <directory>] [--force]",
+    "  npx @chenronggui/hookdock download [--output <directory>] [--force]",
   ].join("\n");
 }
 

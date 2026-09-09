@@ -21,8 +21,8 @@ HookDock 是面向 Windows 的通知中枢，用来接管 AI 编码工具和本�
 可以从 GitHub Actions 或带版本标签的 GitHub Release 下载 x64 NSIS 安装包。npm 下载器只下载与自身版本一致的安装包，完成 SHA-256 校验后保存文件，不会自动运行：
 
 ```powershell
-npx @xiaoguigui/hookdock@0.1.0 download
-npx @xiaoguigui/hookdock@0.1.0 download --output .\dist
+npx @chenronggui/hookdock@0.1.0 download
+npx @chenronggui/hookdock@0.1.0 download --output .\dist
 ```
 
 首版安装包尚未进行代码签名，因此 Windows SmartScreen 可能显示“未知发布者”。

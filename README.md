@@ -21,8 +21,8 @@ HookDock is a Windows notification hub for AI coding tools and local automation.
 Download the x64 NSIS installer from GitHub Actions or a tagged GitHub Release. The npm downloader fetches the release matching its own version, verifies SHA-256, and does not run the installer:
 
 ```powershell
-npx @xiaoguigui/hookdock@0.1.0 download
-npx @xiaoguigui/hookdock@0.1.0 download --output .\dist
+npx @chenronggui/hookdock@0.1.0 download
+npx @chenronggui/hookdock@0.1.0 download --output .\dist
 ```
 
 The initial installer is unsigned, so Windows SmartScreen may identify it as coming from an unknown publisher.
