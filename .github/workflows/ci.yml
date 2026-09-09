@@ -12,8 +12,8 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -26,6 +26,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run npm:test
       - run: cargo fmt --all --check
+      - run: npm run bridge:build
       - run: cargo test --workspace
       - run: npm run dist:win
       - name: Normalize installer name
@@ -40,4 +41,3 @@ jobs:
           name: HookDock-Windows-x64
           path: release/HookDock-Setup-x64.exe
           if-no-files-found: error
-
