@@ -51,21 +51,7 @@ jobs:
       - name: Check npm version availability
         id: npm_version
         if: startsWith(github.ref, 'refs/tags/v')
-        shell: pwsh
-        run: |
-          $manifest = Get-Content release/manifest.json -Raw | ConvertFrom-Json
-          $package = "$($manifest.npmPackage)@$($manifest.version)"
-          $publishedVersion = npm view $package version --json 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            "published=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-            Write-Host "$package is already published; npm publish will be skipped."
-            exit 0
-          }
-          $lookupError = $publishedVersion | ConvertFrom-Json
-          if ($lookupError.error.code -ne "E404") {
-            throw "Could not check npm version availability: $publishedVersion"
-          }
-          "published=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        run: node scripts/check-npm-version.mjs
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
