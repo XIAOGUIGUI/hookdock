@@ -17,6 +17,7 @@
     "bin",
     "lib",
     "assets",
+    "INSTALL.zh-CN.md",
     "README.md"
   ],
   "engines": {

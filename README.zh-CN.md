@@ -28,8 +28,15 @@ npx @chenronggui/hookdock@0.1.1 download-terminal
 npx @chenronggui/hookdock@0.1.1 download-terminal --output .\dist
 ```
 
-Terminal 命令会保存一个供 Windows 11 内部测试使用的无签名 MSIX。请在管理员 PowerShell 中执行
-`Add-AppxPackage .\HookDockTerminal_*_x64_unsigned.msix -AllowUnsigned`。
+Terminal 命令会保存一个供 Windows 11 内部测试使用的无签名 MSIX。请在管理员 PowerShell 中执行：
+
+```powershell
+$package = Get-ChildItem .\HookDockTerminal_*_x64_unsigned.msix | Select-Object -First 1
+Add-AppxPackage -Path $package.FullName -AllowUnsigned
+```
+
+两个下载命令都会在安装包旁生成 `HookDock-安装与使用说明.md`，离线提供完整的
+安装、首次配置、Codex Pane 跳转、更新、卸载和排障步骤。
 
 安装包尚未进行代码签名，因此 Windows 可能显示“未知发布者”。Terminal
 MSIX 使用 Windows 11 明确支持的无签名包身份，不适合公开分发。

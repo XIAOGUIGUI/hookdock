@@ -14,6 +14,7 @@ if (tarballs.length !== 1) {
 
 const smokeDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "hookdock-npm-smoke-"));
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const guideName = "HookDock-安装与使用说明.md";
 try {
   const install = spawnSync(
     npmCommand,
@@ -53,7 +54,8 @@ try {
   if (
     download.error ||
     download.status !== 0 ||
-    !fs.existsSync(path.join(downloadDirectory, "HookDock-Setup-x64.exe"))
+    !fs.existsSync(path.join(downloadDirectory, "HookDock-Setup-x64.exe")) ||
+    !fs.existsSync(path.join(downloadDirectory, guideName))
   ) {
     process.stderr.write(download.stdout ?? "");
     process.stderr.write(download.stderr ?? "");
@@ -67,7 +69,12 @@ try {
       { encoding: "utf8", shell: process.platform === "win32" },
     );
     const expectedTerminal = path.join(downloadDirectory, path.basename(process.env.HOOKDOCK_TERMINAL_ASSET));
-    if (terminalDownload.error || terminalDownload.status !== 0 || !fs.existsSync(expectedTerminal)) {
+    if (
+      terminalDownload.error ||
+      terminalDownload.status !== 0 ||
+      !fs.existsSync(expectedTerminal) ||
+      !terminalDownload.stdout.includes(guideName)
+    ) {
       process.stderr.write(terminalDownload.stdout ?? "");
       process.stderr.write(terminalDownload.stderr ?? "");
       throw terminalDownload.error ?? new Error("Packed HookDock Terminal download failed");

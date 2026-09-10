@@ -6,9 +6,11 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 const ASSET_MANIFEST_NAME = "manifest.json";
+export const INSTALLATION_GUIDE_NAME = "HookDock-安装与使用说明.md";
 const HOOKDOCK_PRODUCT = "hookdock";
 const TERMINAL_PRODUCT = "terminal";
 const DEFAULT_ASSETS_DIRECTORY = fileURLToPath(new URL("../assets", import.meta.url));
+const DEFAULT_GUIDE_PATH = fileURLToPath(new URL("../INSTALL.zh-CN.md", import.meta.url));
 
 export function usage() {
   return [
@@ -71,19 +73,29 @@ export function parseAssetManifest(contents) {
   return manifest;
 }
 
-export async function downloadInstaller(options, assetsDirectory = DEFAULT_ASSETS_DIRECTORY) {
-  const result = await downloadBundledProduct(HOOKDOCK_PRODUCT, options, assetsDirectory);
+export async function downloadInstaller(
+  options,
+  assetsDirectory = DEFAULT_ASSETS_DIRECTORY,
+  guideSource = DEFAULT_GUIDE_PATH,
+) {
+  const result = await downloadBundledProduct(
+    HOOKDOCK_PRODUCT,
+    options,
+    assetsDirectory,
+    guideSource,
+  );
   return result.destination;
 }
 
 export async function downloadTerminalInstaller(
   options,
   assetsDirectory = DEFAULT_ASSETS_DIRECTORY,
+  guideSource = DEFAULT_GUIDE_PATH,
 ) {
-  return downloadBundledProduct(TERMINAL_PRODUCT, options, assetsDirectory);
+  return downloadBundledProduct(TERMINAL_PRODUCT, options, assetsDirectory, guideSource);
 }
 
-async function downloadBundledProduct(product, options, assetsDirectory) {
+async function downloadBundledProduct(product, options, assetsDirectory, guideSource) {
   let manifest;
   try {
     manifest = parseAssetManifest(
@@ -118,6 +130,7 @@ async function downloadBundledProduct(product, options, assetsDirectory) {
 
   const destinationDirectory = path.resolve(options.output);
   const destination = path.join(destinationDirectory, artifact.file);
+  const guideDestination = path.join(destinationDirectory, INSTALLATION_GUIDE_NAME);
   const temporary = `${destination}.copy-${process.pid}`;
   await mkdir(destinationDirectory, { recursive: true });
   if (!options.force && await exists(destination)) {
@@ -128,9 +141,27 @@ async function downloadBundledProduct(product, options, assetsDirectory) {
     await copyFile(source, temporary, constants.COPYFILE_EXCL);
     if (options.force) await rm(destination, { force: true });
     await rename(temporary, destination);
-    return { destination, version: artifact.version };
+    await copyInstallationGuide(guideSource, guideDestination, options.force);
+    return { destination, guideDestination, version: artifact.version };
   } catch (error) {
     await rm(temporary, { force: true });
+    throw error;
+  }
+}
+
+async function copyInstallationGuide(source, destination, force) {
+  if (!force && await exists(destination)) return;
+
+  const temporary = `${destination}.copy-${process.pid}`;
+  try {
+    await copyFile(source, temporary, constants.COPYFILE_EXCL);
+    if (force) await rm(destination, { force: true });
+    await rename(temporary, destination);
+  } catch (error) {
+    await rm(temporary, { force: true });
+    if (error?.code === "ENOENT") {
+      throw new Error("this npm package does not contain the offline installation guide");
+    }
     throw error;
   }
 }

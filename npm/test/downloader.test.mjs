@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   downloadTerminalInstaller,
+  INSTALLATION_GUIDE_NAME,
   parseArguments,
   parseAssetManifest,
   usage,
@@ -74,10 +75,13 @@ test("copies a verified terminal installer without network access", async () => 
   const outputDirectory = path.join(fixtureDirectory, "output");
   const assetName = "HookDockTerminal_0.1.0.0_x64_unsigned.msix";
   const assetBytes = Buffer.from("test terminal package");
+  const guideBytes = Buffer.from("# Offline installation guide\n");
+  const guideSource = path.join(fixtureDirectory, "guide.md");
   const checksum = createHash("sha256").update(assetBytes).digest("hex");
 
   try {
     await writeFile(path.join(fixtureDirectory, assetName), assetBytes);
+    await writeFile(guideSource, guideBytes);
     await writeFile(
       path.join(fixtureDirectory, "manifest.json"),
       JSON.stringify({
@@ -93,10 +97,12 @@ test("copies a verified terminal installer without network access", async () => 
     );
 
     const options = parseArguments(["download-terminal", "--output", outputDirectory], "0.1.0");
-    const result = await downloadTerminalInstaller(options, fixtureDirectory);
+    const result = await downloadTerminalInstaller(options, fixtureDirectory, guideSource);
     assert.equal(result.version, "0.1.0.0");
     assert.equal(result.destination, path.join(outputDirectory, assetName));
+    assert.equal(result.guideDestination, path.join(outputDirectory, INSTALLATION_GUIDE_NAME));
     assert.deepEqual(await readFile(result.destination), assetBytes);
+    assert.deepEqual(await readFile(result.guideDestination), guideBytes);
 
     await assert.rejects(
       () => downloadTerminalInstaller(options, fixtureDirectory),
@@ -129,6 +135,7 @@ test("rejects a bundled terminal installer with the wrong checksum", async () =>
       () => downloadTerminalInstaller(
         { output: fixtureDirectory, force: false },
         fixtureDirectory,
+        path.join(fixtureDirectory, "missing-guide.md"),
       ),
       /failed SHA-256 verification/,
     );

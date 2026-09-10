@@ -32,8 +32,16 @@ npx @chenronggui/hookdock@0.1.1 download-terminal --output .\dist
 ```
 
 The Terminal command writes an unsigned Windows 11 test package. Install it
-from an elevated PowerShell with
-`Add-AppxPackage .\HookDockTerminal_*_x64_unsigned.msix -AllowUnsigned`.
+from an elevated PowerShell with:
+
+```powershell
+$package = Get-ChildItem .\HookDockTerminal_*_x64_unsigned.msix | Select-Object -First 1
+Add-AppxPackage -Path $package.FullName -AllowUnsigned
+```
+
+Both download commands also write `HookDock-安装与使用说明.md` beside the
+installer with offline setup, Codex pane activation, update, removal, and
+troubleshooting instructions in Chinese.
 
 The installers are unsigned, so Windows may identify HookDock as coming from
 an unknown publisher. The Terminal MSIX uses Windows 11's explicit unsigned
