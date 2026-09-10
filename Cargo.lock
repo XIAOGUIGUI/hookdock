@@ -1604,7 +1604,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hookdock-hook"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "hookdock-protocol",
  "serde_json",
@@ -1613,7 +1613,7 @@ dependencies = [
 
 [[package]]
 name = "hookdock-protocol"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "serde",
@@ -1623,7 +1623,7 @@ dependencies = [
 
 [[package]]
 name = "hookdock-windows"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "dirs 6.0.0",

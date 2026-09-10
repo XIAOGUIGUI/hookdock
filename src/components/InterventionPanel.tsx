@@ -55,7 +55,10 @@ export function InterventionPanel({ event, pending, profile, onRespond, onOpenFo
 
       {event.questions.map((question) => (
         <fieldset className="question" key={question.id} disabled={!pending || busy}>
-          <legend>{question.prompt}</legend>
+          <legend>
+            {question.header ? <span className="question-header">{question.header}</span> : null}
+            <span>{question.prompt}</span>
+          </legend>
           {question.options.length > 0 ? (
             <div className="question-options">
               {question.options.map((option) => {
@@ -73,14 +76,17 @@ export function InterventionPanel({ event, pending, profile, onRespond, onOpenFo
                 );
               })}
             </div>
-          ) : (
+          ) : null}
+          {question.options.length === 0 || question.allowFreeform ? (
             <input
               className="answer-input"
-              value={answers[question.id] ?? ""}
+              type={question.isSecret ? "password" : "text"}
+              autoComplete={question.isSecret ? "new-password" : undefined}
+              value={question.options.some((option) => option.label === (answers[question.id] ?? "")) ? "" : (answers[question.id] ?? "")}
               onChange={(inputEvent) => setAnswers((current) => ({ ...current, [question.id]: inputEvent.target.value }))}
-              placeholder={t("answerPlaceholder")}
+              placeholder={question.isSecret ? t("secretAnswerPlaceholder") : question.options.length > 0 ? t("customAnswerPlaceholder") : t("answerPlaceholder")}
             />
-          )}
+          ) : null}
         </fieldset>
       ))}
 
@@ -89,7 +95,7 @@ export function InterventionPanel({ event, pending, profile, onRespond, onOpenFo
           <button className="primary-button" type="button" disabled={busy || !allQuestionsAnswered} onClick={() => submit({ decision: "answer", answers })}>
             <Check size={17} />{t("submitAnswer")}
           </button>
-          <button className="danger-button" type="button" disabled={busy} onClick={() => submit({ decision: "deny" })}>
+          <button className="danger-button" type="button" disabled={busy} onClick={() => submit({ decision: "cancel" })}>
             <X size={17} />{t("cancel")}
           </button>
         </div>

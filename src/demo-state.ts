@@ -84,7 +84,7 @@ export const demoState: AppState = {
   },
   genericCommand: '"C:\\Program Files\\HookDock\\resources\\bridge\\hookdock-hook.exe" --source generic',
   platform: "win32",
-  version: "0.1.1",
+  version: "0.1.2",
 };
 
 export const demoBridge: HookDockBridge = {

@@ -123,9 +123,15 @@ pub struct QuestionOption {
 #[serde(rename_all = "camelCase")]
 pub struct HookQuestion {
     pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub header: Option<String>,
     pub prompt: String,
     pub options: Vec<QuestionOption>,
     pub multi_select: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub allow_freeform: bool,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub is_secret: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -266,6 +272,21 @@ fn project_name(cwd: Option<&String>) -> String {
         .to_owned()
 }
 
+fn is_codex_user_input_event(source: &str, event_type: &str) -> bool {
+    if source != "codex" {
+        return false;
+    }
+    matches!(
+        event_type
+            .chars()
+            .filter(|character| character.is_ascii_alphanumeric())
+            .flat_map(char::to_lowercase)
+            .collect::<String>()
+            .as_str(),
+        "userinputrequest" | "requestuserinput"
+    )
+}
+
 fn detect_questions(payload: &Map<String, Value>) -> Vec<HookQuestion> {
     let tool_input = as_object(payload.get("tool_input"));
     let raw_questions = tool_input
@@ -319,11 +340,24 @@ fn detect_questions(payload: &Map<String, Value>) -> Vec<HookQuestion> {
                 .collect();
             Some(HookQuestion {
                 id,
+                header: non_empty(question.get("header")),
                 prompt,
                 options,
                 multi_select: question
                     .get("multiSelect")
                     .or_else(|| question.get("multi_select"))
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+                allow_freeform: question
+                    .get("isOther")
+                    .or_else(|| question.get("is_other"))
+                    .or_else(|| question.get("allowFreeform"))
+                    .or_else(|| question.get("allow_freeform"))
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+                is_secret: question
+                    .get("isSecret")
+                    .or_else(|| question.get("is_secret"))
                     .and_then(Value::as_bool)
                     .unwrap_or(false),
             })
@@ -479,8 +513,11 @@ pub fn normalize_hook(request: &BridgeRequest, now: DateTime<Utc>) -> HookEvent 
         "askuserquestion" | "askfollowupquestion" | "ask"
     );
     let supports_question_answers = matches!(source, "claude" | "generic");
+    let is_codex_user_input_request =
+        is_codex_user_input_event(source, &event_type) && !questions.is_empty();
     let expects_response = (source != "gemini" && status == EventStatus::WaitingApproval)
-        || (supports_question_answers && is_question_tool && !questions.is_empty());
+        || (supports_question_answers && is_question_tool && !questions.is_empty())
+        || is_codex_user_input_request;
     let provider = provider_name(source).to_owned();
 
     HookEvent {
@@ -515,6 +552,8 @@ pub fn normalize_hook(request: &BridgeRequest, now: DateTime<Utc>) -> HookEvent 
         tool_use_id: first_string([
             non_empty(request.payload.get("tool_use_id")),
             non_empty(request.payload.get("toolUseId")),
+            non_empty(request.payload.get("call_id")),
+            non_empty(request.payload.get("callId")),
         ]),
         questions,
         expects_response,
@@ -553,6 +592,37 @@ pub fn provider_stdout(
 
     if decision == Decision::Answer {
         let provided_answers = response.answers.clone().unwrap_or_default();
+        if is_codex_user_input_event(source, &event) {
+            let questions = detect_questions(payload);
+            if questions.is_empty() {
+                return "{}".to_owned();
+            }
+            let mut answers = Map::new();
+            for question in questions {
+                let Some(answer) = provided_answers
+                    .get(&question.id)
+                    .map(|answer| answer.trim())
+                    .filter(|answer| !answer.is_empty())
+                else {
+                    return "{}".to_owned();
+                };
+                let values = if question.multi_select {
+                    answer
+                        .split(", ")
+                        .map(str::trim)
+                        .filter(|value| !value.is_empty())
+                        .map(ToOwned::to_owned)
+                        .collect::<Vec<_>>()
+                } else {
+                    vec![answer.to_owned()]
+                };
+                if values.is_empty() {
+                    return "{}".to_owned();
+                }
+                answers.insert(question.id, json!({ "answers": values }));
+            }
+            return json!({ "answers": answers }).to_string();
+        }
         let mut answers = HashMap::new();
         let raw_questions = as_object(payload.get("tool_input"))
             .and_then(|input| input.get("questions"))
@@ -703,6 +773,85 @@ mod tests {
             Utc::now(),
         );
         assert!(!event.expects_response);
+    }
+
+    #[test]
+    fn codex_user_input_request_is_blocking_and_preserves_question_metadata() {
+        let event = normalize_hook(
+            &request(
+                "codex",
+                json!({
+                    "hook_event_name": "UserInputRequest",
+                    "tool_name": "request_user_input",
+                    "call_id": "call-123",
+                    "questions": [{
+                        "id": "environment",
+                        "header": "Environment",
+                        "question": "Where should I deploy?",
+                        "options": [{ "label": "Staging", "description": "Safe test environment" }],
+                        "isOther": true,
+                        "isSecret": true
+                    }]
+                }),
+            ),
+            Utc::now(),
+        );
+        assert_eq!(event.status, EventStatus::WaitingInput);
+        assert!(event.expects_response);
+        assert_eq!(event.tool_use_id.as_deref(), Some("call-123"));
+        assert_eq!(event.questions[0].header.as_deref(), Some("Environment"));
+        assert!(event.questions[0].allow_freeform);
+        assert!(event.questions[0].is_secret);
+    }
+
+    #[test]
+    fn formats_codex_user_input_answers() {
+        let payload = json!({
+            "hook_event_name": "UserInputRequest",
+            "questions": [
+                { "id": "environment", "question": "Where?", "options": [] },
+                { "id": "features", "question": "Which?", "multiSelect": true }
+            ]
+        })
+        .as_object()
+        .cloned()
+        .unwrap();
+        let response = BridgeResponse {
+            decision: Some(Decision::Answer),
+            answers: Some(HashMap::from([
+                ("environment".to_owned(), "Staging".to_owned()),
+                ("features".to_owned(), "Logs, Metrics".to_owned()),
+            ])),
+            ..BridgeResponse::acknowledged("id")
+        };
+        let output: Value =
+            serde_json::from_str(&provider_stdout("codex", None, &payload, &response)).unwrap();
+        assert_eq!(
+            output,
+            json!({
+                "answers": {
+                    "environment": { "answers": ["Staging"] },
+                    "features": { "answers": ["Logs", "Metrics"] }
+                }
+            })
+        );
+    }
+
+    #[test]
+    fn incomplete_codex_user_input_answers_fail_open() {
+        let payload = json!({
+            "hook_event_name": "UserInputRequest",
+            "questions": [{ "id": "environment", "question": "Where?" }]
+        })
+        .as_object()
+        .cloned()
+        .unwrap();
+        let response = BridgeResponse {
+            decision: Some(Decision::Answer),
+            answers: Some(HashMap::new()),
+            ..BridgeResponse::acknowledged("id")
+        };
+        assert_eq!(provider_stdout("codex", None, &payload, &response), "{}");
     }
 
     #[test]

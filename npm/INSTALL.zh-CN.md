@@ -16,21 +16,21 @@ HookDock Terminal 当前是供内部使用的无签名 MSIX。Windows 10 不支�
 
 ```powershell
 npm config get registry
-npm view @chenronggui/hookdock@0.1.1 version
+npm view @chenronggui/hookdock@0.1.2 version
 ```
 
 在准备保存安装包的目录中执行：
 
 ```powershell
-npx --yes @chenronggui/hookdock@0.1.1 download
-npx --yes @chenronggui/hookdock@0.1.1 download-terminal
+npx --yes @chenronggui/hookdock@0.1.2 download
+npx --yes @chenronggui/hookdock@0.1.2 download-terminal
 ```
 
 也可以指定输出目录：
 
 ```powershell
-npx --yes @chenronggui/hookdock@0.1.1 download --output .\dist
-npx --yes @chenronggui/hookdock@0.1.1 download-terminal --output .\dist
+npx --yes @chenronggui/hookdock@0.1.2 download --output .\dist
+npx --yes @chenronggui/hookdock@0.1.2 download-terminal --output .\dist
 ```
 
 这两个命令只从 npm 包内部复制文件，不会在运行时访问 GitHub，也不会自动执行安装程序。每个安装包都会先经过 SHA-256 校验。文件已存在时可加 `--force` 覆盖。
@@ -100,11 +100,13 @@ $env:WT_SESSION
 
 如果通知来自普通 Windows Terminal、PowerShell 窗口或旧 Pane，HookDock 不会冒充精确匹配；它会打开 HookDock 的事件详情作为降级行为。
 
-## 7. 当前 Codex 能力边界
+## 7. Codex `request_user_input` 兼容性
 
 - 支持接收 Codex Hook 的权限、完成和生命周期事件。
 - 支持点击通知返回 HookDock Terminal 中的原 Pane。
-- Codex 0.153.4 的 `request_user_input` 是内部事件，目前不会触发外部 `PermissionRequest` Hook。因此 HookDock 暂时不能通过现有 Codex Hook 直接显示并代答这类问题；请回到原 Pane 回答。
+- HookDock 已支持专用的阻塞事件 `UserInputRequest`，可以显示选项、自定义输入和敏感输入，并把答案回传给 Codex。
+- 官方 Codex 0.153.4 还不会发出这个外部事件；需要安装实现了 `UserInputRequest` 契约的 Codex 版本。未修改的 Codex 会继续在原 Pane 中显示问题，不影响其他通知和点击跳转能力。
+- HookDock 不可用、用户取消或回答无效时，定制 Codex 必须回退到自己的原生提问界面。
 
 ## 8. 更新和卸载
 

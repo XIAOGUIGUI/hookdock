@@ -1,6 +1,6 @@
 {
   "name": "@chenronggui/hookdock",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Offline-friendly installer bundle for HookDock and HookDock Terminal",
   "license": "Apache-2.0",
   "repository": {

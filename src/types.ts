@@ -16,9 +16,12 @@ export interface QuestionOption {
 
 export interface HookQuestion {
   id: string;
+  header?: string;
   prompt: string;
   options: QuestionOption[];
   multiSelect: boolean;
+  allowFreeform?: boolean;
+  isSecret?: boolean;
 }
 
 export interface TerminalTarget {

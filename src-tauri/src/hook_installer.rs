@@ -76,6 +76,11 @@ const CODEX_EVENTS: &[HookEventDescriptor] = &[
         timeout: None,
     },
     HookEventDescriptor {
+        name: "UserInputRequest",
+        matcher: None,
+        timeout: Some(86_400),
+    },
+    HookEventDescriptor {
         name: "PermissionRequest",
         matcher: Some(".*"),
         timeout: Some(86_400),
@@ -417,5 +422,32 @@ mod tests {
         installer.uninstall(&["claude".to_owned()]).unwrap();
         assert!(!installer.status()["claude"].installed);
         assert_eq!(read_configuration(&config).unwrap()["theme"], "dark");
+    }
+
+    #[test]
+    fn codex_install_adds_blocking_user_input_hook_and_preserves_existing_fields() {
+        let merged = merge_profile(
+            json!({
+                "model": "gpt-5",
+                "hooks": {
+                    "UserInputRequest": [{
+                        "hooks": [{ "type": "command", "command": "keep-me.exe" }]
+                    }]
+                }
+            }),
+            "codex",
+            Path::new("C:\\HookDock\\hookdock-hook.exe"),
+        )
+        .unwrap();
+
+        assert_eq!(merged["model"], "gpt-5");
+        let entries = merged["hooks"]["UserInputRequest"].as_array().unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(command_from_entry(&entries[0]), Some("keep-me.exe"));
+        assert_eq!(entries[1]["hooks"][0]["timeout"], 86_400);
+        assert_eq!(
+            command_from_entry(&entries[1]),
+            Some("\"C:\\HookDock\\hookdock-hook.exe\" --source codex")
+        );
     }
 }

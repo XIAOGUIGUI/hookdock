@@ -10,10 +10,10 @@ That offline Chinese guide covers installation, first-time setup, Codex pane
 activation, corporate npm mirrors, upgrades, removal, and troubleshooting.
 
 ```bash
-npx @chenronggui/hookdock@0.1.1 download
-npx @chenronggui/hookdock@0.1.1 download --output ./dist
-npx @chenronggui/hookdock@0.1.1 download-terminal
-npx @chenronggui/hookdock@0.1.1 download-terminal --output ./dist
+npx @chenronggui/hookdock@0.1.2 download
+npx @chenronggui/hookdock@0.1.2 download --output ./dist
+npx @chenronggui/hookdock@0.1.2 download-terminal
+npx @chenronggui/hookdock@0.1.2 download-terminal --output ./dist
 ```
 
 Use `--force` to replace an existing installer. Install the unsigned

@@ -25,10 +25,10 @@ the commands work through a corporate npm mirror without contacting GitHub.
 The CLI verifies SHA-256 and does not run either installer:
 
 ```powershell
-npx @chenronggui/hookdock@0.1.1 download
-npx @chenronggui/hookdock@0.1.1 download --output .\dist
-npx @chenronggui/hookdock@0.1.1 download-terminal
-npx @chenronggui/hookdock@0.1.1 download-terminal --output .\dist
+npx @chenronggui/hookdock@0.1.2 download
+npx @chenronggui/hookdock@0.1.2 download --output .\dist
+npx @chenronggui/hookdock@0.1.2 download-terminal
+npx @chenronggui/hookdock@0.1.2 download-terminal --output .\dist
 ```
 
 The Terminal command writes an unsigned Windows 11 test package. Install it
@@ -71,6 +71,8 @@ Open Settings to connect the supported provider hooks. A generic stdin hook can 
 For local HTTP clients, read `%APPDATA%\HookDock\runtime.json`, then use its port and token. See [HTTP API](docs/http-api.md).
 
 For exact Codex pane activation, see [Codex notification → exact terminal pane](docs/codex-terminal-focus.md).
+
+For the Codex fork change that exposes `request_user_input` to HookDock, see the [Chinese `UserInputRequest` hook contract](docs/codex-user-input-hook-contract.zh-CN.md).
 
 HookDock only listens on loopback and creates a new random token for every app launch. If HookDock is closed, provider hook commands return `{}` quickly so the calling tool can continue its normal flow.
 
