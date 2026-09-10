@@ -262,11 +262,22 @@ impl Storage {
         self.events.clone()
     }
 
-    pub fn add_event(&mut self, event: HookEvent) -> Result<(), String> {
+    pub fn add_event(&mut self, mut event: HookEvent) -> Result<HookEvent, String> {
+        if event.source == "codex"
+            && event.terminal_target.is_none()
+            && !event.terminal_context_observed
+        {
+            event.terminal_target = self
+                .events
+                .iter()
+                .find(|candidate| candidate.session_key == event.session_key)
+                .and_then(|candidate| candidate.terminal_target.clone());
+        }
         self.events.retain(|candidate| candidate.id != event.id);
-        self.events.insert(0, event);
+        self.events.insert(0, event.clone());
         self.events.truncate(MAX_EVENT_HISTORY);
-        write_json_atomic(&self.directory.join("events.json"), &self.events)
+        write_json_atomic(&self.directory.join("events.json"), &self.events)?;
+        Ok(event)
     }
 
     pub fn resolve_event(&mut self, id: &str, decision: Decision) -> Result<bool, String> {
@@ -310,7 +321,31 @@ fn write_json_atomic(path: &Path, value: &impl Serialize) -> Result<(), String> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hookdock_protocol::{TerminalTarget, TerminalTargetKind};
+    use serde_json::json;
     use tempfile::tempdir;
+
+    fn event(id: &str, terminal_target: Option<TerminalTarget>) -> HookEvent {
+        let mut value = json!({
+            "id": id,
+            "source": "codex",
+            "providerName": "Codex",
+            "eventType": "Stop",
+            "sessionKey": "codex:thread-1",
+            "project": "hookdock",
+            "title": "Codex completed",
+            "body": "Done",
+            "status": "completed",
+            "questions": [],
+            "expectsResponse": false,
+            "shouldNotify": true,
+            "receivedAt": "2026-09-10T00:00:00Z"
+        });
+        if let Some(target) = terminal_target {
+            value["terminalTarget"] = serde_json::to_value(target).unwrap();
+        }
+        serde_json::from_value(value).unwrap()
+    }
 
     #[test]
     fn source_profiles_persist_valid_updates() {
@@ -356,5 +391,43 @@ mod tests {
         let generic = storage.source_profile("generic");
         assert_eq!(generic.name, "Custom Hook");
         assert_eq!(generic.accent_color, "#22d3ee");
+    }
+
+    #[test]
+    fn codex_events_reuse_the_latest_terminal_target_for_the_session() {
+        let directory = tempdir().unwrap();
+        let mut storage = Storage::load(directory.path().to_owned());
+        let target = TerminalTarget {
+            kind: TerminalTargetKind::HookDockTerminal,
+            session_id: "7f6b3978-25f1-4519-8b02-8fe67f35991f".to_owned(),
+            protocol: 1,
+        };
+        storage
+            .add_event(event("first", Some(target.clone())))
+            .unwrap();
+        let inherited = storage.add_event(event("second", None)).unwrap();
+
+        assert_eq!(inherited.terminal_target, Some(target.clone()));
+        assert_eq!(
+            Storage::load(directory.path().to_owned()).events()[0].terminal_target,
+            Some(target)
+        );
+    }
+
+    #[test]
+    fn observed_non_capable_terminal_context_clears_a_cached_target() {
+        let directory = tempdir().unwrap();
+        let mut storage = Storage::load(directory.path().to_owned());
+        let target = TerminalTarget {
+            kind: TerminalTargetKind::HookDockTerminal,
+            session_id: "7f6b3978-25f1-4519-8b02-8fe67f35991f".to_owned(),
+            protocol: 1,
+        };
+        storage.add_event(event("first", Some(target))).unwrap();
+        let mut moved_to_another_terminal = event("second", None);
+        moved_to_another_terminal.terminal_context_observed = true;
+
+        let stored = storage.add_event(moved_to_another_terminal).unwrap();
+        assert!(stored.terminal_target.is_none());
     }
 }

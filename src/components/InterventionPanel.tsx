@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, ExternalLink, FolderOpen, X } from "lucide-react";
+import { Check, ExternalLink, FolderOpen, SquareTerminal, X } from "lucide-react";
 import { useI18n } from "../i18n";
 import type { HookEvent, HookResponse, OperationResult, SourceProfile } from "../types";
 
@@ -10,9 +10,10 @@ interface InterventionPanelProps {
   onRespond(response: HookResponse): Promise<OperationResult>;
   onOpenFolder(): void;
   onOpenUrl(): void;
+  onOpenTerminal(): void;
 }
 
-export function InterventionPanel({ event, pending, profile, onRespond, onOpenFolder, onOpenUrl }: InterventionPanelProps) {
+export function InterventionPanel({ event, pending, profile, onRespond, onOpenFolder, onOpenUrl, onOpenTerminal }: InterventionPanelProps) {
   const { t } = useI18n();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -45,6 +46,7 @@ export function InterventionPanel({ event, pending, profile, onRespond, onOpenFo
           <h1>{event.title}</h1>
         </div>
         <div className="detail-actions">
+          {event.terminalTarget ? <button className="icon-button subtle" type="button" aria-label={t("openTerminal")} onClick={onOpenTerminal}><SquareTerminal size={18} /></button> : null}
           {event.url ? <button className="icon-button subtle" type="button" aria-label={t("openLink")} onClick={onOpenUrl}><ExternalLink size={18} /></button> : null}
           {event.cwd ? <button className="icon-button subtle" type="button" aria-label={t("openFolder")} onClick={onOpenFolder}><FolderOpen size={18} /></button> : null}
         </div>

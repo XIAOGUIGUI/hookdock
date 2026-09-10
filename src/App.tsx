@@ -145,6 +145,7 @@ export default function App() {
               onRespond={(response) => respond(selectedEvent.id, response)}
               onOpenFolder={() => { if (selectedEvent.cwd) bridge.openFolder(selectedEvent.cwd); }}
               onOpenUrl={() => { if (selectedEvent.url) bridge.openUrl(selectedEvent.url); }}
+              onOpenTerminal={() => { void bridge.focusEventTerminal(selectedEvent.id); }}
             />
           ) : null}
 
@@ -159,6 +160,7 @@ export default function App() {
                 profile={state.sourceProfiles.find((profile) => profile.id === event.source)}
                 onSelect={() => setSelectedId(event.id)}
                 onOpenUrl={() => { if (event.url) bridge.openUrl(event.url); }}
+                onOpenTerminal={() => { void bridge.focusEventTerminal(event.id); }}
                 onDismiss={async () => {
                   await bridge.dismissEvent(event.id);
                   if (!("__TAURI_INTERNALS__" in window)) {

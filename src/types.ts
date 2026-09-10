@@ -21,6 +21,12 @@ export interface HookQuestion {
   multiSelect: boolean;
 }
 
+export interface TerminalTarget {
+  kind: "hookdockTerminal";
+  sessionId: string;
+  protocol: 1;
+}
+
 export interface HookEvent {
   id: string;
   source: HookSource;
@@ -32,6 +38,8 @@ export interface HookEvent {
   title: string;
   body: string;
   url?: string;
+  terminalTarget?: TerminalTarget;
+  terminalContextObserved?: boolean;
   status: EventStatus;
   toolName?: string;
   toolUseId?: string;
@@ -100,6 +108,7 @@ export interface HookDockBridge {
   onState(callback: (state: AppState) => void): () => void;
   respond(id: string, response: HookResponse): Promise<OperationResult>;
   dismissEvent(id: string): Promise<OperationResult>;
+  focusEventTerminal(id: string): Promise<OperationResult>;
   updateSettings(patch: Partial<AppSettings>): Promise<AppSettings>;
   updateSourceProfile(id: HookSource, patch: Partial<Omit<SourceProfile, "id">>): Promise<SourceProfile[]>;
   installHooks(sources: HookSource[]): Promise<OperationResult>;

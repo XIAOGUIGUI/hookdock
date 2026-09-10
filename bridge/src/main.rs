@@ -175,19 +175,22 @@ fn send_request(
     Ok(response)
 }
 
+const CAPTURED_ENVIRONMENT_KEYS: &[&str] = &[
+    "PWD",
+    "TERM",
+    "TERM_PROGRAM",
+    "WT_SESSION",
+    "HOOKDOCK_TERMINAL",
+    "HOOKDOCK_TERMINAL_PROTOCOL",
+    "TTY",
+    "CLAUDE_SESSION_ID",
+    "CODEX_THREAD_ID",
+    "VSCODE_PID",
+    "CURSOR_TRACE_ID",
+];
+
 fn captured_environment() -> HashMap<String, String> {
-    const KEYS: &[&str] = &[
-        "PWD",
-        "TERM",
-        "TERM_PROGRAM",
-        "WT_SESSION",
-        "TTY",
-        "CLAUDE_SESSION_ID",
-        "CODEX_THREAD_ID",
-        "VSCODE_PID",
-        "CURSOR_TRACE_ID",
-    ];
-    let mut values: HashMap<String, String> = KEYS
+    let mut values: HashMap<String, String> = CAPTURED_ENVIRONMENT_KEYS
         .iter()
         .filter_map(|key| env::var(key).ok().map(|value| ((*key).to_owned(), value)))
         .collect();
@@ -221,5 +224,12 @@ mod tests {
         let arguments =
             parse_arguments(vec!["--source".to_owned(), "custom-agent".to_owned()]).unwrap();
         assert_eq!(arguments.source, "generic");
+    }
+
+    #[test]
+    fn captures_the_hookdock_terminal_capability_contract() {
+        assert!(CAPTURED_ENVIRONMENT_KEYS.contains(&"WT_SESSION"));
+        assert!(CAPTURED_ENVIRONMENT_KEYS.contains(&"HOOKDOCK_TERMINAL"));
+        assert!(CAPTURED_ENVIRONMENT_KEYS.contains(&"HOOKDOCK_TERMINAL_PROTOCOL"));
     }
 }

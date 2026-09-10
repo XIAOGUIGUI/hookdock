@@ -15,6 +15,7 @@ HookDock 是面向 Windows 的通知中枢，用来接管 AI 编码工具和本�
 - 将 196 × 52 的胶囊拖到任意显示器左右边缘，并记住位置。
 - 跟随 Windows 语言，也可手动选择简体中文或英文。
 - 最近 50 条事件保存在 `%APPDATA%\HookDock`，数据不会上传。
+- 配合 HookDock Terminal，点击 Codex 通知可以返回发出事件的原始 Pane。
 
 ## 下载
 
@@ -49,6 +50,8 @@ npm run dev
 ```
 
 本机 HTTP 客户端先读取 `%APPDATA%\HookDock\runtime.json` 中的端口和令牌，然后调用 API。接口说明见 [HTTP API](docs/http-api.zh-CN.md)。
+
+精确返回 Codex Pane 的工作方式见 [Codex 通知点击返回原 Pane](docs/codex-terminal-focus.zh-CN.md)。
 
 HookDock 只监听回环地址，每次启动都会生成新的随机令牌。HookDock 未运行时，工具 Hook 会快速返回 `{}`，避免阻塞调用方。
 

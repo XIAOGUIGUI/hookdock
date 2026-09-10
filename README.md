@@ -15,6 +15,7 @@ HookDock is a Windows notification hub for AI coding tools and local automation.
 - Snap a compact 196 × 52 capsule to either edge of any monitor and remember its position.
 - Follow the Windows display language or switch between English and Simplified Chinese.
 - Keep the most recent 50 events locally under `%APPDATA%\HookDock`.
+- Return a Codex notification to its exact pane when used with HookDock Terminal.
 
 ## Download
 
@@ -49,6 +50,8 @@ Open Settings to connect the supported provider hooks. A generic stdin hook can 
 ```
 
 For local HTTP clients, read `%APPDATA%\HookDock\runtime.json`, then use its port and token. See [HTTP API](docs/http-api.md).
+
+For exact Codex pane activation, see [Codex notification → exact terminal pane](docs/codex-terminal-focus.md).
 
 HookDock only listens on loopback and creates a new random token for every app launch. If HookDock is closed, provider hook commands return `{}` quickly so the calling tool can continue its normal flow.
 

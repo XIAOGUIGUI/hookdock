@@ -1628,6 +1628,7 @@ dependencies = [
  "chrono",
  "dirs 6.0.0",
  "hookdock-protocol",
+ "notify-rust",
  "rand",
  "serde",
  "serde_json",

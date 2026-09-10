@@ -2,9 +2,12 @@ mod file_replace;
 mod hook_installer;
 mod hook_server;
 mod storage;
+mod terminal_focus;
 
 use chrono::Utc;
 use hook_installer::{HookInstallState, HookInstaller};
+#[cfg(target_os = "windows")]
+use hookdock_protocol::TerminalTarget;
 use hookdock_protocol::{
     normalize_hook, BridgeRequest, BridgeResponse, Decision, HookEvent, PROTOCOL_VERSION,
 };
@@ -21,6 +24,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, State, WebviewWindow, WindowEvent};
 use tauri_plugin_autostart::ManagerExt as AutostartManagerExt;
 use tauri_plugin_clipboard_manager::ClipboardExt;
+#[cfg(not(target_os = "windows"))]
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
 
@@ -86,12 +90,18 @@ impl RuntimeState {
     }
 
     pub(crate) fn ingest(&self, app: &AppHandle, event: HookEvent) {
-        let (settings, profile) = {
+        let (event, settings, profile) = {
             let mut storage = self.storage.lock().expect("storage lock");
-            if let Err(error) = storage.add_event(event.clone()) {
-                eprintln!("Failed to persist HookDock event: {error}");
-            }
-            (storage.settings(), storage.source_profile(&event.source))
+            let stored_event = match storage.add_event(event.clone()) {
+                Ok(event) => event,
+                Err(error) => {
+                    eprintln!("Failed to persist HookDock event: {error}");
+                    event
+                }
+            };
+            let settings = storage.settings();
+            let profile = storage.source_profile(&stored_event.source);
+            (stored_event, settings, profile)
         };
         *self.selected_event_id.lock().expect("selected event lock") = Some(event.id.clone());
 
@@ -100,15 +110,7 @@ impl RuntimeState {
             && settings.notifications_enabled
             && event.should_notify
         {
-            let mut notification = app
-                .notification()
-                .builder()
-                .title(&event.title)
-                .body(&event.body);
-            if !settings.play_sound || !profile.play_sound {
-                notification = notification.sound("Silent");
-            }
-            let _ = notification.show();
+            show_hook_notification(app, &event, !settings.play_sound || !profile.play_sound);
         }
         if profile.enabled
             && profile.auto_expand
@@ -154,6 +156,82 @@ impl RuntimeState {
     pub(crate) fn emit_snapshot(&self, app: &AppHandle) {
         let _ = app.emit("app-state", self.snapshot());
     }
+}
+
+#[cfg(target_os = "windows")]
+fn activate_notification(
+    app: &AppHandle,
+    event_id: String,
+    terminal_target: Option<TerminalTarget>,
+) {
+    let Some(state) = app.try_state::<Arc<RuntimeState>>() else {
+        return;
+    };
+    *state.selected_event_id.lock().expect("selected event lock") = Some(event_id);
+
+    if terminal_target
+        .as_ref()
+        .is_some_and(|target| terminal_focus::focus_terminal(target).is_ok())
+    {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.hide();
+        }
+        state.emit_snapshot(app);
+    } else {
+        reveal_window(app, &state, true);
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn show_hook_notification(app: &AppHandle, event: &HookEvent, silent: bool) {
+    use notify_rust::{Notification, NotificationResponse};
+
+    let mut notification = Notification::new();
+    notification.summary(&event.title).body(&event.body);
+    if silent {
+        notification.sound_name("Silent");
+    }
+
+    if std::env::current_exe()
+        .ok()
+        .and_then(|path| path.parent().map(Path::to_owned))
+        .is_some_and(|directory| {
+            let directory = directory.to_string_lossy().to_ascii_lowercase();
+            !directory.ends_with("\\target\\debug") && !directory.ends_with("\\target\\release")
+        })
+    {
+        notification.app_id(&app.config().identifier);
+    }
+
+    let Ok(handle) = notification.show() else {
+        return;
+    };
+    let app = app.clone();
+    let event_id = event.id.clone();
+    let terminal_target = event.terminal_target.clone();
+    std::thread::spawn(move || {
+        let _ = handle.wait_for_response(move |response: &NotificationResponse| {
+            if matches!(
+                response,
+                NotificationResponse::Default | NotificationResponse::Action(_)
+            ) {
+                activate_notification(&app, event_id.clone(), terminal_target.clone());
+            }
+        });
+    });
+}
+
+#[cfg(not(target_os = "windows"))]
+fn show_hook_notification(app: &AppHandle, event: &HookEvent, silent: bool) {
+    let mut notification = app
+        .notification()
+        .builder()
+        .title(&event.title)
+        .body(&event.body);
+    if silent {
+        notification = notification.sound("Silent");
+    }
+    let _ = notification.show();
 }
 
 #[derive(Clone, Serialize)]
@@ -270,6 +348,34 @@ fn dismiss_event(
             OperationResult::ok()
         }
         Err(error) => OperationResult::error(error),
+    }
+}
+
+#[tauri::command]
+fn focus_event_terminal(
+    app: AppHandle,
+    state: State<'_, Arc<RuntimeState>>,
+    id: String,
+) -> OperationResult {
+    let target = state
+        .storage
+        .lock()
+        .expect("storage lock")
+        .events()
+        .into_iter()
+        .find(|event| event.id == id)
+        .and_then(|event| event.terminal_target);
+    match target {
+        Some(target) => match terminal_focus::focus_terminal(&target) {
+            Ok(()) => {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+                OperationResult::ok()
+            }
+            Err(error) => OperationResult::error(error),
+        },
+        None => OperationResult::error("该通知没有可用的 HookDock Terminal Pane"),
     }
 }
 
@@ -610,6 +716,7 @@ pub fn run() {
             get_state,
             respond_to_hook,
             dismiss_event,
+            focus_event_terminal,
             update_settings,
             update_source_profile,
             install_hooks,

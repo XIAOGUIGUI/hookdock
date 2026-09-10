@@ -19,6 +19,7 @@ const nativeBridge: HookDockBridge = {
   },
   respond: (id: string, response: HookResponse) => invoke<OperationResult>("respond_to_hook", { id, response }),
   dismissEvent: (id: string) => invoke<OperationResult>("dismiss_event", { id }),
+  focusEventTerminal: (id: string) => invoke<OperationResult>("focus_event_terminal", { id }),
   updateSettings: (patch: Partial<AppSettings>) => invoke<AppSettings>("update_settings", { patch }),
   updateSourceProfile: (id: HookSource, patch: Partial<Omit<SourceProfile, "id">>) => invoke<SourceProfile[]>("update_source_profile", { id, patch }),
   installHooks: (sources: HookSource[]) => invoke<OperationResult>("install_hooks", { sources }),

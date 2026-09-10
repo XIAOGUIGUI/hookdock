@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 pub const PROTOCOL_VERSION: u8 = 1;
+pub const HOOKDOCK_TERMINAL_PROTOCOL_VERSION: u8 = 1;
 pub const MAX_HOOK_BYTES: u64 = 2 * 1024 * 1024;
 pub const DEFAULT_HOOK_PORT: u16 = 37_129;
 
@@ -95,6 +96,20 @@ pub enum EventStatus {
     Error,
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub enum TerminalTargetKind {
+    #[serde(rename = "hookdockTerminal")]
+    HookDockTerminal,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminalTarget {
+    pub kind: TerminalTargetKind,
+    pub session_id: String,
+    pub protocol: u8,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QuestionOption {
@@ -128,6 +143,10 @@ pub struct HookEvent {
     pub body: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal_target: Option<TerminalTarget>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub terminal_context_observed: bool,
     pub status: EventStatus,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_name: Option<String>,
@@ -141,6 +160,43 @@ pub struct HookEvent {
     pub resolved_at: Option<DateTime<Utc>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resolution: Option<Decision>,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+fn codex_terminal_target(request: &BridgeRequest, source: &str) -> Option<TerminalTarget> {
+    if source != "codex"
+        || request.environment.get("HOOKDOCK_TERMINAL")?.trim() != "1"
+        || request
+            .environment
+            .get("HOOKDOCK_TERMINAL_PROTOCOL")?
+            .trim()
+            .parse::<u8>()
+            .ok()?
+            != HOOKDOCK_TERMINAL_PROTOCOL_VERSION
+    {
+        return None;
+    }
+
+    let session_id = Uuid::parse_str(request.environment.get("WT_SESSION")?.trim()).ok()?;
+    Some(TerminalTarget {
+        kind: TerminalTargetKind::HookDockTerminal,
+        session_id: session_id.hyphenated().to_string(),
+        protocol: HOOKDOCK_TERMINAL_PROTOCOL_VERSION,
+    })
+}
+
+fn terminal_context_observed(request: &BridgeRequest, source: &str) -> bool {
+    source == "codex"
+        && [
+            "WT_SESSION",
+            "HOOKDOCK_TERMINAL",
+            "HOOKDOCK_TERMINAL_PROTOCOL",
+        ]
+        .iter()
+        .any(|key| request.environment.contains_key(*key))
 }
 
 fn as_object(value: Option<&Value>) -> Option<&Map<String, Value>> {
@@ -452,6 +508,8 @@ pub fn normalize_hook(request: &BridgeRequest, now: DateTime<Utc>) -> HookEvent 
         ),
         body: detect_body(&request.payload, tool_name.as_ref(), &questions, status),
         url: non_empty(request.payload.get("url")),
+        terminal_target: codex_terminal_target(request, source),
+        terminal_context_observed: terminal_context_observed(request, source),
         status,
         tool_name,
         tool_use_id: first_string([
@@ -645,6 +703,62 @@ mod tests {
             Utc::now(),
         );
         assert!(!event.expects_response);
+    }
+
+    #[test]
+    fn captures_a_marked_hookdock_terminal_session_for_codex() {
+        let mut request = request("codex", json!({ "thread_id": "thread-1" }));
+        request.environment.extend([
+            ("HOOKDOCK_TERMINAL".to_owned(), "1".to_owned()),
+            ("HOOKDOCK_TERMINAL_PROTOCOL".to_owned(), "1".to_owned()),
+            (
+                "WT_SESSION".to_owned(),
+                "{7F6B3978-25F1-4519-8B02-8FE67F35991F}".to_owned(),
+            ),
+        ]);
+
+        let event = normalize_hook(&request, Utc::now());
+        let target = event.terminal_target.unwrap();
+        assert!(event.terminal_context_observed);
+        assert_eq!(target.kind, TerminalTargetKind::HookDockTerminal);
+        assert_eq!(target.protocol, HOOKDOCK_TERMINAL_PROTOCOL_VERSION);
+        assert_eq!(target.session_id, "7f6b3978-25f1-4519-8b02-8fe67f35991f");
+    }
+
+    #[test]
+    fn ignores_unmarked_or_invalid_terminal_sessions() {
+        let mut unmarked = request("codex", json!({ "thread_id": "thread-1" }));
+        unmarked.environment.insert(
+            "WT_SESSION".to_owned(),
+            "7f6b3978-25f1-4519-8b02-8fe67f35991f".to_owned(),
+        );
+        assert!(normalize_hook(&unmarked, Utc::now())
+            .terminal_target
+            .is_none());
+        assert!(normalize_hook(&unmarked, Utc::now()).terminal_context_observed);
+
+        let mut invalid = unmarked;
+        invalid
+            .environment
+            .insert("HOOKDOCK_TERMINAL".to_owned(), "1".to_owned());
+        invalid
+            .environment
+            .insert("HOOKDOCK_TERMINAL_PROTOCOL".to_owned(), "1".to_owned());
+        invalid
+            .environment
+            .insert("WT_SESSION".to_owned(), "not-a-guid".to_owned());
+        assert!(normalize_hook(&invalid, Utc::now())
+            .terminal_target
+            .is_none());
+
+        invalid.source = "claude".to_owned();
+        invalid.environment.insert(
+            "WT_SESSION".to_owned(),
+            "7f6b3978-25f1-4519-8b02-8fe67f35991f".to_owned(),
+        );
+        assert!(normalize_hook(&invalid, Utc::now())
+            .terminal_target
+            .is_none());
     }
 
     #[test]

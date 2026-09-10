@@ -1,4 +1,4 @@
-import { Check, CircleAlert, Clock3, ExternalLink, Trash2 } from "lucide-react";
+import { Check, CircleAlert, Clock3, ExternalLink, SquareTerminal, Trash2 } from "lucide-react";
 import { useI18n } from "../i18n";
 import type { HookEvent, SourceProfile } from "../types";
 import { relativeTime } from "../lib/time";
@@ -11,6 +11,7 @@ interface EventRowProps {
   onSelect(): void;
   onDismiss(): void;
   onOpenUrl(): void;
+  onOpenTerminal(): void;
 }
 
 function StatusGlyph({ event }: { event: HookEvent }) {
@@ -21,7 +22,7 @@ function StatusGlyph({ event }: { event: HookEvent }) {
   return <Clock3 size={14} />;
 }
 
-export function EventRow({ event, selected, pending, profile, onSelect, onDismiss, onOpenUrl }: EventRowProps) {
+export function EventRow({ event, selected, pending, profile, onSelect, onDismiss, onOpenUrl, onOpenTerminal }: EventRowProps) {
   const { locale, t } = useI18n();
   return (
     <article className={`event-row ${selected ? "is-selected" : ""}`}>
@@ -42,6 +43,7 @@ export function EventRow({ event, selected, pending, profile, onSelect, onDismis
         </span>
       </button>
       <span className="event-actions">
+        {event.terminalTarget ? <button className="dismiss-button" type="button" aria-label={t("openTerminal")} onClick={onOpenTerminal}><SquareTerminal size={15} /></button> : null}
         {event.url ? <button className="dismiss-button" type="button" aria-label={t("openLink")} onClick={onOpenUrl}><ExternalLink size={15} /></button> : null}
         {!pending ? <button className="dismiss-button" type="button" aria-label={`${t("remove")} ${event.title}`} onClick={onDismiss}><Trash2 size={15} /></button> : null}
       </span>
