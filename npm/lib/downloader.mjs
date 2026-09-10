@@ -1,22 +1,22 @@
 import { createHash } from "node:crypto";
-import { createWriteStream, readFileSync } from "node:fs";
-import { access, mkdir, readFile, rename, rm } from "node:fs/promises";
-import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
+import { constants, readFileSync } from "node:fs";
+import { access, copyFile, mkdir, readFile, rename, rm } from "node:fs/promises";
 import path from "node:path";
+import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-const OWNER = "XIAOGUIGUI";
-const REPOSITORY = "hookdock";
-const ASSET_NAME = "HookDock-Setup-x64.exe";
-const CHECKSUM_NAME = "checksums.txt";
+const ASSET_MANIFEST_NAME = "manifest.json";
+const HOOKDOCK_PRODUCT = "hookdock";
+const TERMINAL_PRODUCT = "terminal";
+const DEFAULT_ASSETS_DIRECTORY = fileURLToPath(new URL("../assets", import.meta.url));
 
 export function usage() {
   return [
-    "Download the verified HookDock Windows installer.",
+    "Download verified HookDock Windows installers from this npm package.",
     "",
     "Usage:",
     "  npx @chenronggui/hookdock download [--output <directory>] [--force]",
+    "  npx @chenronggui/hookdock download-terminal [--output <directory>] [--force]",
   ].join("\n");
 }
 
@@ -24,8 +24,9 @@ export function parseArguments(argumentsList, version = packageVersion()) {
   if (argumentsList.includes("--help") || argumentsList.includes("-h")) {
     return { help: true, force: false, output: process.cwd(), version };
   }
-  if (argumentsList[0] !== "download") {
-    throw new Error(`expected the \"download\" command\n\n${usage()}`);
+  const command = argumentsList[0];
+  if (command !== "download" && command !== "download-terminal") {
+    throw new Error(`expected the \"download\" or \"download-terminal\" command\n\n${usage()}`);
   }
   let output = process.cwd();
   let force = false;
@@ -42,46 +43,92 @@ export function parseArguments(argumentsList, version = packageVersion()) {
       throw new Error(`unknown option: ${argument}`);
     }
   }
-  return { help: false, force, output, version };
+  return { command, help: false, force, output, version };
 }
 
-export function parseChecksum(contents, assetName = ASSET_NAME) {
-  for (const line of contents.split(/\r?\n/)) {
-    const match = line.trim().match(/^([a-fA-F0-9]{64})\s+\*?(.+)$/);
-    if (match && match[2] === assetName) return match[1].toLowerCase();
+export function parseAssetManifest(contents) {
+  let manifest;
+  try {
+    manifest = JSON.parse(contents);
+  } catch {
+    throw new Error("bundled installer manifest is not valid JSON");
   }
-  throw new Error(`checksum for ${assetName} was not found`);
+  if (manifest?.schemaVersion !== 1 || typeof manifest.products !== "object") {
+    throw new Error("bundled installer manifest has an unsupported schema");
+  }
+
+  for (const [product, artifact] of Object.entries(manifest.products)) {
+    if (
+      typeof artifact?.version !== "string" ||
+      typeof artifact?.file !== "string" ||
+      path.basename(artifact.file) !== artifact.file ||
+      !/^[a-fA-F0-9]{64}$/.test(artifact?.sha256 ?? "")
+    ) {
+      throw new Error(`bundled installer metadata for ${product} is invalid`);
+    }
+    artifact.sha256 = artifact.sha256.toLowerCase();
+  }
+  return manifest;
 }
 
-export async function downloadInstaller(options) {
-  const tag = `v${options.version}`;
-  const releaseRoot = `https://github.com/${OWNER}/${REPOSITORY}/releases/download/${tag}`;
+export async function downloadInstaller(options, assetsDirectory = DEFAULT_ASSETS_DIRECTORY) {
+  const result = await downloadBundledProduct(HOOKDOCK_PRODUCT, options, assetsDirectory);
+  return result.destination;
+}
+
+export async function downloadTerminalInstaller(
+  options,
+  assetsDirectory = DEFAULT_ASSETS_DIRECTORY,
+) {
+  return downloadBundledProduct(TERMINAL_PRODUCT, options, assetsDirectory);
+}
+
+async function downloadBundledProduct(product, options, assetsDirectory) {
+  let manifest;
+  try {
+    manifest = parseAssetManifest(
+      await readFile(path.join(assetsDirectory, ASSET_MANIFEST_NAME), "utf8"),
+    );
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      throw new Error("this npm package does not contain bundled Windows installers");
+    }
+    throw error;
+  }
+
+  const artifact = manifest.products[product];
+  if (!artifact) {
+    throw new Error(`this npm package does not contain the ${product} installer`);
+  }
+
+  const source = path.join(assetsDirectory, artifact.file);
+  let sourceBytes;
+  try {
+    sourceBytes = await readFile(source);
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      throw new Error(`bundled installer ${artifact.file} is missing`);
+    }
+    throw error;
+  }
+  const actualChecksum = createHash("sha256").update(sourceBytes).digest("hex");
+  if (actualChecksum !== artifact.sha256) {
+    throw new Error(`bundled ${artifact.file} failed SHA-256 verification`);
+  }
+
   const destinationDirectory = path.resolve(options.output);
-  const destination = path.join(destinationDirectory, ASSET_NAME);
-  const temporary = `${destination}.download-${process.pid}`;
+  const destination = path.join(destinationDirectory, artifact.file);
+  const temporary = `${destination}.copy-${process.pid}`;
   await mkdir(destinationDirectory, { recursive: true });
   if (!options.force && await exists(destination)) {
     throw new Error(`${destination} already exists; pass --force to replace it`);
   }
 
-  const checksumResponse = await fetch(`${releaseRoot}/${CHECKSUM_NAME}`, { redirect: "follow" });
-  if (!checksumResponse.ok) throw new Error(`could not fetch checksums (${checksumResponse.status})`);
-  const expectedChecksum = parseChecksum(await checksumResponse.text());
-
-  const installerResponse = await fetch(`${releaseRoot}/${ASSET_NAME}`, { redirect: "follow" });
-  if (!installerResponse.ok || !installerResponse.body) {
-    throw new Error(`could not download installer (${installerResponse.status})`);
-  }
-
   try {
-    await pipeline(Readable.fromWeb(installerResponse.body), createWriteStream(temporary, { flags: "wx" }));
-    const actualChecksum = createHash("sha256").update(await readFile(temporary)).digest("hex");
-    if (actualChecksum !== expectedChecksum) {
-      throw new Error("downloaded installer failed SHA-256 verification");
-    }
+    await copyFile(source, temporary, constants.COPYFILE_EXCL);
     if (options.force) await rm(destination, { force: true });
     await rename(temporary, destination);
-    return destination;
+    return { destination, version: artifact.version };
   } catch (error) {
     await rm(temporary, { force: true });
     throw error;

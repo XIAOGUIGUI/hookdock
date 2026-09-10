@@ -19,14 +19,25 @@ HookDock is a Windows notification hub for AI coding tools and local automation.
 
 ## Download
 
-Download the x64 NSIS installer from GitHub Actions or a tagged GitHub Release. The npm downloader fetches the release matching its own version, verifies SHA-256, and does not run the installer:
+Download the x64 installers from GitHub Actions, a tagged GitHub Release, or
+the npm package. Both installers are embedded in the published npm tarball, so
+the commands work through a corporate npm mirror without contacting GitHub.
+The CLI verifies SHA-256 and does not run either installer:
 
 ```powershell
-npx @chenronggui/hookdock@0.1.0 download
-npx @chenronggui/hookdock@0.1.0 download --output .\dist
+npx @chenronggui/hookdock@0.1.1 download
+npx @chenronggui/hookdock@0.1.1 download --output .\dist
+npx @chenronggui/hookdock@0.1.1 download-terminal
+npx @chenronggui/hookdock@0.1.1 download-terminal --output .\dist
 ```
 
-The initial installer is unsigned, so Windows SmartScreen may identify it as coming from an unknown publisher.
+The Terminal command writes an unsigned Windows 11 test package. Install it
+from an elevated PowerShell with
+`Add-AppxPackage .\HookDockTerminal_*_x64_unsigned.msix -AllowUnsigned`.
+
+The installers are unsigned, so Windows may identify HookDock as coming from
+an unknown publisher. The Terminal MSIX uses Windows 11's explicit unsigned
+package identity and is intended for internal testing.
 
 ## Local development
 

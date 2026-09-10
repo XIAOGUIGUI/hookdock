@@ -34,12 +34,45 @@ try {
     shell: process.platform === "win32",
   });
   if (help.error) throw help.error;
-  if (help.status !== 0 || !help.stdout.includes("Download the verified HookDock Windows installer")) {
+  if (
+    help.status !== 0 ||
+    !help.stdout.includes("Download verified HookDock Windows installers") ||
+    !help.stdout.includes("download-terminal")
+  ) {
     process.stderr.write(help.stdout ?? "");
     process.stderr.write(help.stderr ?? "");
     throw new Error("Packed HookDock CLI smoke test failed");
   }
   process.stdout.write(help.stdout);
+
+  const downloadDirectory = path.join(smokeDirectory, "downloads");
+  const download = spawnSync(executable, ["download", "--output", downloadDirectory], {
+    encoding: "utf8",
+    shell: process.platform === "win32",
+  });
+  if (
+    download.error ||
+    download.status !== 0 ||
+    !fs.existsSync(path.join(downloadDirectory, "HookDock-Setup-x64.exe"))
+  ) {
+    process.stderr.write(download.stdout ?? "");
+    process.stderr.write(download.stderr ?? "");
+    throw download.error ?? new Error("Packed HookDock installer download failed");
+  }
+
+  if (process.env.HOOKDOCK_TERMINAL_ASSET) {
+    const terminalDownload = spawnSync(
+      executable,
+      ["download-terminal", "--output", downloadDirectory],
+      { encoding: "utf8", shell: process.platform === "win32" },
+    );
+    const expectedTerminal = path.join(downloadDirectory, path.basename(process.env.HOOKDOCK_TERMINAL_ASSET));
+    if (terminalDownload.error || terminalDownload.status !== 0 || !fs.existsSync(expectedTerminal)) {
+      process.stderr.write(terminalDownload.stdout ?? "");
+      process.stderr.write(terminalDownload.stderr ?? "");
+      throw terminalDownload.error ?? new Error("Packed HookDock Terminal download failed");
+    }
+  }
 } finally {
   fs.rmSync(smokeDirectory, { recursive: true, force: true });
 }

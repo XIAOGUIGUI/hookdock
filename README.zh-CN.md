@@ -19,14 +19,20 @@ HookDock 是面向 Windows 的通知中枢，用来接管 AI 编码工具和本�
 
 ## 下载
 
-可以从 GitHub Actions 或带版本标签的 GitHub Release 下载 x64 NSIS 安装包。npm 下载器只下载与自身版本一致的安装包，完成 SHA-256 校验后保存文件，不会自动运行：
+可以从 GitHub Actions、带版本标签的 GitHub Release 或 npm 包获取 x64 安装包。正式发布的 npm tarball 内嵌 HookDock 和 HookDock Terminal，因此接入公司 npm 镜像后，以下命令运行时不会访问 GitHub。CLI 会先完成 SHA-256 校验，并且不会自动运行安装程序：
 
 ```powershell
-npx @chenronggui/hookdock@0.1.0 download
-npx @chenronggui/hookdock@0.1.0 download --output .\dist
+npx @chenronggui/hookdock@0.1.1 download
+npx @chenronggui/hookdock@0.1.1 download --output .\dist
+npx @chenronggui/hookdock@0.1.1 download-terminal
+npx @chenronggui/hookdock@0.1.1 download-terminal --output .\dist
 ```
 
-首版安装包尚未进行代码签名，因此 Windows SmartScreen 可能显示“未知发布者”。
+Terminal 命令会保存一个供 Windows 11 内部测试使用的无签名 MSIX。请在管理员 PowerShell 中执行
+`Add-AppxPackage .\HookDockTerminal_*_x64_unsigned.msix -AllowUnsigned`。
+
+安装包尚未进行代码签名，因此 Windows 可能显示“未知发布者”。Terminal
+MSIX 使用 Windows 11 明确支持的无签名包身份，不适合公开分发。
 
 ## 本地开发
 

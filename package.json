@@ -1,6 +1,6 @@
 {
   "name": "hookdock-windows",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "A Windows notification hub for AI coding tools and local automation",
   "type": "module",

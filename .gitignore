@@ -2,9 +2,9 @@
 /dist/
 /target/
 /src-tauri/resources/*.exe
+/npm/assets/
 /.idea/
 /.vscode/
 *.log
 *.profraw
 .DS_Store
-

@@ -1,7 +1,7 @@
 {
   "name": "@chenronggui/hookdock",
-  "version": "0.1.0",
-  "description": "Verified downloader for the HookDock Windows installer",
+  "version": "0.1.1",
+  "description": "Offline-friendly installer bundle for HookDock and HookDock Terminal",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
@@ -16,6 +16,7 @@
   "files": [
     "bin",
     "lib",
+    "assets",
     "README.md"
   ],
   "engines": {

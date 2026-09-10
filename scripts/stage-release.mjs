@@ -9,6 +9,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const nsisDirectory = path.join(root, "target", "release", "bundle", "nsis");
 const releaseDirectory = path.join(root, "release");
 const npmDirectory = path.join(root, "npm");
+const npmAssetsDirectory = path.join(npmDirectory, "assets");
 const installerName = "HookDock-Setup-x64.exe";
 
 const installers = fs
@@ -35,6 +36,39 @@ for (const entry of fs.readdirSync(releaseDirectory, { withFileTypes: true })) {
 const installerPath = path.join(releaseDirectory, installerName);
 fs.copyFileSync(path.join(nsisDirectory, installers[0].name), installerPath);
 
+fs.rmSync(npmAssetsDirectory, { recursive: true, force: true });
+fs.mkdirSync(npmAssetsDirectory, { recursive: true });
+const bundledInstallerPath = path.join(npmAssetsDirectory, installerName);
+fs.copyFileSync(installerPath, bundledInstallerPath);
+
+const npmPackage = JSON.parse(fs.readFileSync(path.join(npmDirectory, "package.json"), "utf8"));
+const bundledProducts = {
+  hookdock: assetMetadata(bundledInstallerPath, npmPackage.version),
+};
+
+const terminalAssetSource = process.env.HOOKDOCK_TERMINAL_ASSET;
+if (terminalAssetSource) {
+  const terminalVersion = process.env.HOOKDOCK_TERMINAL_VERSION;
+  if (!/^\d+\.\d+\.\d+\.\d+$/.test(terminalVersion ?? "")) {
+    throw new Error("HOOKDOCK_TERMINAL_VERSION must use A.B.C.D");
+  }
+  if (!fs.statSync(terminalAssetSource).isFile()) {
+    throw new Error(`HookDock Terminal asset is not a file: ${terminalAssetSource}`);
+  }
+  const terminalName = path.basename(terminalAssetSource);
+  if (!/^HookDockTerminal_\d+\.\d+\.\d+\.\d+_x64_unsigned\.msix$/.test(terminalName)) {
+    throw new Error(`Unexpected HookDock Terminal asset name: ${terminalName}`);
+  }
+  const bundledTerminalPath = path.join(npmAssetsDirectory, terminalName);
+  fs.copyFileSync(terminalAssetSource, bundledTerminalPath);
+  bundledProducts.terminal = assetMetadata(bundledTerminalPath, terminalVersion);
+}
+
+fs.writeFileSync(
+  path.join(npmAssetsDirectory, "manifest.json"),
+  `${JSON.stringify({ schemaVersion: 1, products: bundledProducts }, null, 2)}\n`,
+);
+
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const packed = spawnSync(
   npmCommand,
@@ -49,12 +83,12 @@ if (packed.status !== 0) {
 }
 
 const packResult = JSON.parse(packed.stdout);
-if (!Array.isArray(packResult) || packResult.length !== 1 || !packResult[0].filename) {
+const packEntries = Array.isArray(packResult) ? packResult : Object.values(packResult);
+if (packEntries.length !== 1 || !packEntries[0].filename) {
   throw new Error("npm pack did not return exactly one package");
 }
 
-const npmPackage = JSON.parse(fs.readFileSync(path.join(npmDirectory, "package.json"), "utf8"));
-const tarballPath = path.join(releaseDirectory, packResult[0].filename);
+const tarballPath = path.join(releaseDirectory, packEntries[0].filename);
 const assets = [installerPath, tarballPath].map((assetPath) => ({
   file: path.basename(assetPath),
   sha256: createHash("sha256").update(fs.readFileSync(assetPath)).digest("hex"),
@@ -85,3 +119,11 @@ if (process.env.GITHUB_OUTPUT) {
 }
 
 process.stdout.write(`Staged ${assets.map((asset) => asset.file).join(", ")}\n`);
+
+function assetMetadata(assetPath, version) {
+  return {
+    version,
+    file: path.basename(assetPath),
+    sha256: createHash("sha256").update(fs.readFileSync(assetPath)).digest("hex"),
+  };
+}
